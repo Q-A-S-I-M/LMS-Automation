@@ -1,0 +1,47 @@
+{
+  "timeouts_ms": {
+    "page_load": 30000,
+    "element": 15000
+  },
+  "login": {
+    "student": {
+      "path": "/login",
+      "identifier": "form input:nth-of-type(1)",
+      "password": "form input[type='password']",
+      "submit": "form button[type='submit']"
+    },
+    "teacher": {
+      "path": "/teacher/login",
+      "identifier": "form input:nth-of-type(1)",
+      "password": "form input[type='password']",
+      "submit": "form button[type='submit']"
+    }
+  },
+  "register": {
+    "path": "/register",
+    "roll_no": "form input:nth-of-type(1)",
+    "full_name": "form input:nth-of-type(2)",
+    "email": "form input:nth-of-type(3)",
+    "password": "form input[type='password']",
+    "submit": "form button[type='submit']"
+  },
+  "student": {
+    "registration": {
+      "path": "/app/registration",
+      "semester_input": "input.select",
+      "available_table_rows": ".panel:nth-of-type(3) table tbody tr",
+      "register_button_in_row": "button.btn",
+      "my_table_rows": ".panel:nth-of-type(2) table tbody tr",
+      "unregister_button_in_row": "button.btnGhost"
+    },
+    "marks": {
+      "path": "/app/marks",
+      "course_select": "select.select"
+    },
+    "attendance": {
+      "path": "/app/attendance",
+      "course_select": "select.select"
+    }
+  }
+}
+
