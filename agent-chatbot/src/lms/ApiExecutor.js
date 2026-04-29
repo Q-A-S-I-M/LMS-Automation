@@ -103,17 +103,34 @@ export class ApiExecutor {
 
   _buildRequest({ method, path, parameters, sessionState }) {
     const m = method.toUpperCase();
-    let url = `${this.apiBase}${path}`;
+    let cleanPath = path;
+    const enhancedParams = { ...parameters };
+
+    // 1. Handle URL path parameters (e.g., /api/student/marks/:courseId)
+    const pathParams = cleanPath.match(/:[a-zA-Z0-9]+/g) || [];
+    for (const p of pathParams) {
+      const key = p.substring(1);
+      const val = enhancedParams[key] || enhancedParams.course_code || enhancedParams.courseId;
+      if (val) {
+        cleanPath = cleanPath.replace(p, encodeURIComponent(val));
+        delete enhancedParams[key]; // Don't send as query param if used in path
+      }
+    }
+
+    // 2. Strip placeholder query params from the path (e.g., ?semester=...)
+    // This handles the format in LMS_CAPABILITY_MAP.md
+    cleanPath = cleanPath.replace(/[?&][a-zA-Z0-9_]+=\.\.\./g, "");
+    if (cleanPath.includes("?") && !cleanPath.includes("=") && cleanPath.endsWith("?")) {
+      cleanPath = cleanPath.slice(0, -1);
+    }
+
+    let url = `${this.apiBase}${cleanPath}`;
     let body = undefined;
 
-    // Automatically inject userId into parameters if available and missing
-    const enhancedParams = { ...parameters };
-    // [REMOVED] roll_no injection; backend should identify user via session/token
-    
     if (m === "GET") {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(enhancedParams || {})) {
-        if (v == null) continue;
+        if (v == null || v === "...") continue;
         if (Array.isArray(v)) continue;
         qs.set(k, String(v));
       }

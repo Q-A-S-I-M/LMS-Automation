@@ -58,6 +58,15 @@ export class CapabilityMap {
   listIntents() {
     return [...this.intentsByName.values()].map((x) => x.name).sort();
   }
+
+  getIntentSummaries() {
+    return [...this.intentsByName.values()].map((x) => ({
+      intent: x.name,
+      required_params: x.requiredParams,
+      optional_params: x.optionalParams,
+      allowed_roles: x.allowedRoles
+    }));
+  }
 }
 
 function parseRequiresAuth(chunk) {

@@ -10,6 +10,7 @@ import { logger } from "./logger.js";
 import { SessionManager } from "./sessions/SessionManager.js";
 import { CapabilityMap } from "./lms/CapabilityMap.js";
 import { GeminiService } from "./gemini/GeminiService.js";
+import { OllamaService } from "./ollama/OllamaService.js";
 import { ActionRouter } from "./agents/ActionRouter.js";
 import { AgentController } from "./agents/AgentController.js";
 import { sessionRoutes } from "./routes/sessionRoutes.js";
@@ -70,9 +71,19 @@ const repoRoot = path.resolve(process.cwd(), ".."); // agent-chatbot is inside r
 async function bootstrap() {
   const capabilityMap = await CapabilityMap.loadFromRepoRoot({ repoRoot });
   const sessions = new SessionManager();
-  const geminiService = new GeminiService();
+  
+  // Provider selection
+  let llmService;
+  if (config.LLM_PROVIDER === "ollama") {
+    logger.info({ model: config.OLLAMA_MODEL }, "Using Ollama LLM provider");
+    llmService = new OllamaService();
+  } else {
+    logger.info({ model: config.GEMINI_MODEL }, "Using Gemini LLM provider");
+    llmService = new GeminiService();
+  }
+
   const actionRouter = new ActionRouter();
-  const agent = new AgentController({ capabilityMap, geminiService, actionRouter, logger });
+  const agent = new AgentController({ capabilityMap, llmService, actionRouter, logger });
 
   app.use("/v1", sessionRoutes({ sessions }));
   app.use("/v1", chatRoutes({ sessions, agent }));

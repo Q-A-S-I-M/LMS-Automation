@@ -11,9 +11,9 @@ import { sanitizeUserText } from "../utils/text.js";
  *   - retry (bounded) when safe
  */
 export class AgentController {
-  constructor({ capabilityMap, geminiService, actionRouter, logger }) {
+  constructor({ capabilityMap, llmService, actionRouter, logger }) {
     this.capabilityMap = capabilityMap;
-    this.gemini = geminiService;
+    this.llm = llmService;
     this.router = actionRouter;
     this.logger = logger;
   }
@@ -37,7 +37,7 @@ export class AgentController {
     // LAYER 1: INTENT DETECTION LAYER (STRICT MODE)
     // ---------------------------------------------------------
     this.logger.info("[LAYER 1] Calling Intent Detection...");
-    let plan = await this.gemini.detectIntent({ 
+    let plan = await this.llm.detectIntent({ 
       capabilityMap: this.capabilityMap, 
       sessionState, 
       userMessage: userText 
@@ -69,7 +69,7 @@ export class AgentController {
 
       if (missing.length > 0) {
         this.logger.info(`[AgentController] Missing params: ${missing.join(", ")}`);
-        const missingResponse = await this.gemini.generateResponse({
+        const missingResponse = await this.llm.generateResponse({
           userMessage: userText,
           intent: plan.intent,
           data: null,
@@ -101,7 +101,7 @@ export class AgentController {
     // LAYER 2: RESPONSE GENERATION LAYER
     // ---------------------------------------------------------
     this.logger.info("[LAYER 2] Generating natural language response...");
-    const finalResponse = await this.gemini.generateResponse({
+    const finalResponse = await this.llm.generateResponse({
       userMessage: userText,
       intent: plan.intent,
       data: executionResult?.data,

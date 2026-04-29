@@ -9,9 +9,14 @@ const envSchema = z.object({
   SESSION_TTL_MS: z.coerce.number().int().positive().default(2 * 60 * 60 * 1000),
   SESSION_COOKIE_NAME: z.string().min(1).default("lms_agent_sid"),
 
-  GEMINI_API_KEY: z.string().min(1),
-  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+  LLM_PROVIDER: z.enum(["gemini", "ollama"]).default("gemini"),
+
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_MODEL: z.string().min(1).default("gemini-2.0-flash"),
   GEMINI_API_VERSION: z.string().min(1).default("v1beta"),
+
+  OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+  OLLAMA_MODEL: z.string().min(1).default("granite4.1:3b"),
 
   LMS_API_BASE: z.string().url().default("http://localhost:5000"),
   LMS_WEB_BASE: z.string().url().default("http://localhost:5173"),
@@ -25,7 +30,6 @@ const envSchema = z.object({
 
 export const config = {
   ...envSchema.parse(process.env),
-  GEMINI_MODEL: "gemini-2.5-flash",
 };
 
 export function allowedOriginsSet() {
