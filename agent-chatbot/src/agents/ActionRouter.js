@@ -66,7 +66,7 @@ export class ActionRouter {
 
   async _executeOne({ mode, intentSpec, intentName, parameters, sessionState }) {
     if (mode === "api") {
-      return await this.apiExecutor.execute({ intentSpec, parameters, sessionState });
+      return await this.apiExecutor.execute({ intentSpec, parameters, sessionState, intentName });
     }
 
     // Selenium mappings for high-value flows

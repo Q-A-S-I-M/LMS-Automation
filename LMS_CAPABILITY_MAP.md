@@ -756,14 +756,6 @@ Below is an AI-agent oriented “intent layer” that maps each supported user a
 - **API**
   - `POST /api/auth/logout`
 
-### Intent: `get_current_user`
-- **Required parameters**: none
-- **Requires Authentication?** Optional (returns 401 if not logged in)
-- **Missing info handling**
-  - If 401, ask user to login and whether student or teacher.
-- **API**
-  - `GET /api/auth/me`
-
 ## Student intents
 
 ### Intent: `student_view_profile`

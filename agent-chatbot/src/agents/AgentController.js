@@ -19,212 +19,138 @@ export class AgentController {
   }
 
   async processUserMessage({ sessionState, message }) {
-    console.log(`[AgentController] Processing message: "${message}" for session: ${sessionState.sessionId}`);
+    this.logger.info(`[AgentController] Processing: "${message}"`);
     const userText = sanitizeUserText(message, { maxLen: 4000 });
     sessionState.conversation.push({ role: "user", content: userText, ts: Date.now() });
 
-    console.log("[AgentController] Calling Gemini for plan...");
-    const plan = await this.gemini.proposePlan({ capabilityMap: this.capabilityMap, sessionState, userMessage: userText });
-    console.log("[AgentController] Gemini Plan:", JSON.stringify(plan, null, 2));
-    const intentName = plan.intent;
-
-    if (!intentName) {
-      console.log("[AgentController] No intent detected.");
-      const msg = "I can help with LMS actions like registration, marks, attendance, transcript, or teacher uploads. What would you like to do?";
-      sessionState.conversation.push({ role: "assistant", content: msg, ts: Date.now() });
-      return { reply: msg, executed: null, followups: [] };
+    // ---------------------------------------------------------
+    // LAYER 0: CONVERSATION LAYER (HIGHEST PRIORITY)
+    // ---------------------------------------------------------
+    const conversationResponse = this.checkLayer0(userText);
+    if (conversationResponse) {
+      this.logger.info(`[LAYER 0] Conversation detected: "${conversationResponse}"`);
+      sessionState.conversation.push({ role: "assistant", content: conversationResponse, ts: Date.now() });
+      return { reply: conversationResponse, mode: "conversation" };
     }
 
-    const spec = this.capabilityMap.getIntent(intentName);
-    if (!spec) {
-      console.warn(`[AgentController] Intent "${intentName}" not found in capability map.`);
-      const msg = "I can’t perform that action in this LMS (not in the capability map).";
-      sessionState.conversation.push({ role: "assistant", content: msg, ts: Date.now() });
-      return { reply: msg, executed: null, followups: [] };
+    // ---------------------------------------------------------
+    // LAYER 1: INTENT DETECTION LAYER (STRICT MODE)
+    // ---------------------------------------------------------
+    this.logger.info("[LAYER 1] Calling Intent Detection...");
+    let plan = await this.gemini.detectIntent({ 
+      capabilityMap: this.capabilityMap, 
+      sessionState, 
+      userMessage: userText 
+    });
+
+    // VALIDATION RULES: Invalid JSON retry or fallback to unknown
+    if (!plan || !plan.intent) {
+      this.logger.warn("[LAYER 1] Intent detection failed or returned invalid JSON. Falling back to unknown.");
+      plan = { intent: "unknown", confidence: 0 };
     }
 
-    // Agentic loop (bounded)
-    const MAX_RETRIES = 2;
-    let params = plan.provided_params || {};
+    this.logger.info(`[LAYER 1] Intent: ${plan.intent} (Confidence: ${plan.confidence})`);
 
-    // Cache credentials if user is logging in
-    if (intentName === "student_login" && params.identifier && params.password) {
-      console.log("[AgentController] Caching student credentials");
-      sessionState.auth.credentials.student = { identifier: String(params.identifier), password: String(params.password) };
-    }
-    if (intentName === "teacher_login" && params.identifier && params.password) {
-      console.log("[AgentController] Caching teacher credentials");
-      sessionState.auth.credentials.teacher = { identifier: String(params.identifier), password: String(params.password) };
+    // Update last intent for context memory
+    if (plan.intent !== "unknown") {
+      sessionState.task.lastIntent = plan.intent;
     }
 
-    // Ensure role is set during login intents
-    if (intentName === "student_login") sessionState.role = "student";
-    if (intentName === "teacher_login") sessionState.role = "teacher";
+    // ---------------------------------------------------------
+    // PARAMETER VALIDATION & MISSING PARAMS HANDLING
+    // ---------------------------------------------------------
+    const spec = this.capabilityMap.getIntent(plan.intent);
+    if (plan.intent !== "unknown" && spec) {
+      // Validate required params BEFORE API call
+      const missing = (spec.requiredParams || []).filter(p => {
+        const val = plan.provided_params?.[p];
+        return val == null || String(val).trim() === "";
+      });
 
-    // Missing params -> ask friendly questions (no raw param names if we can help it)
-    if (plan.missing_params?.length) {
-      console.log("[AgentController] Missing parameters:", plan.missing_params);
-      const msg = buildMissingParamsPrompt(intentName, plan.missing_params);
-      sessionState.conversation.push({ role: "assistant", content: msg, ts: Date.now() });
-      return { reply: msg, executed: null, followups: plan.missing_params };
-    }
-
-    // Auth gate: if required and not authenticated, try auto-login if credentials cached; else ask.
-    if (spec.requiresAuth !== "none" && !sessionState.auth.isAuthenticated) {
-      console.log("[AgentController] Auth required. Attempting auto-login...");
-      const auto = await this._tryAutoLogin({ sessionState });
-      if (!auto.ok) {
-        console.log("[AgentController] Auto-login failed or credentials missing.");
-        const msg = sessionState.role === "teacher"
-          ? "You’re not logged in. Please provide your teacher username/email and password."
-          : "You’re not logged in. Please provide your roll no/email and password.";
-        sessionState.conversation.push({ role: "assistant", content: msg, ts: Date.now() });
-        return { reply: msg, executed: null, followups: [] };
+      if (missing.length > 0) {
+        this.logger.info(`[AgentController] Missing params: ${missing.join(", ")}`);
+        const missingResponse = await this.gemini.generateResponse({
+          userMessage: userText,
+          intent: plan.intent,
+          data: null,
+          error: `Missing parameters: ${missing.join(", ")}`,
+          sessionState
+        });
+        sessionState.conversation.push({ role: "assistant", content: missingResponse, ts: Date.now() });
+        return { reply: missingResponse, mode: "response", missing_params: missing };
       }
-      console.log("[AgentController] Auto-login successful.");
     }
 
-    // Execute with retries + API-first fallback.
-    let last = null;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
-      const prefer = plan.action === "selenium" ? "selenium" : "api";
-      console.log(`[AgentController] Execution attempt ${attempt + 1}/${MAX_RETRIES + 1} (mode: ${prefer}, fallback: ${plan.fallback_allowed !== false})`);
-      
-      const result = await this.router.execute({
+    // ---------------------------------------------------------
+    // BACKEND EXECUTION LAYER
+    // ---------------------------------------------------------
+    let executionResult = null;
+    if (plan.intent !== "unknown" && spec) {
+      this.logger.info(`[BACKEND] Executing intent: ${plan.intent}`);
+      executionResult = await this.router.execute({
         intentSpec: spec,
-        intentName,
-        parameters: params,
+        intentName: plan.intent,
+        parameters: plan.provided_params,
         sessionState,
-        prefer,
+        prefer: plan.action || "api",
         fallbackAllowed: plan.fallback_allowed !== false,
       });
-      last = result;
-
-      console.log(`[AgentController] Execution result:`, JSON.stringify(result, null, 2));
-
-      // Update session auth flags on successful login/logout/register
-      if (intentName === "student_login" && result.ok) sessionState.auth.isAuthenticated = true;
-      if (intentName === "teacher_login" && result.ok) sessionState.auth.isAuthenticated = true;
-      if (intentName === "student_register" && result.ok) {
-        sessionState.role = "student";
-        sessionState.auth.isAuthenticated = true;
-      }
-      if (intentName === "logout" && result.ok) {
-        sessionState.role = null;
-        sessionState.auth.isAuthenticated = false;
-        sessionState.auth.lmsCookies = [];
-      }
-
-      if (result.ok) break;
-
-      // If unauthorized, attempt re-login once (using cached creds).
-      if (isAuthError(result) && attempt < MAX_RETRIES) {
-        sessionState.auth.isAuthenticated = false;
-        const auto = await this._tryAutoLogin({ sessionState });
-        if (auto.ok) continue;
-      }
-
-      // Otherwise, retry only once for transient-ish failures.
-      if (attempt < MAX_RETRIES && isRetryable(result)) continue;
-      break;
     }
 
-    const reply = buildHumanFriendlyReply({ intentName, result: last });
-    sessionState.conversation.push({ role: "assistant", content: reply, ts: Date.now() });
-    sessionState.task.lastAction = { intentName, at: Date.now(), ok: Boolean(last?.ok) };
-    return { reply, executed: { intent: intentName, result: last }, followups: [] };
-  }
-
-  async _tryAutoLogin({ sessionState }) {
-    const role = sessionState.role;
-    if (role === "teacher") {
-      const c = sessionState.auth.credentials.teacher;
-      if (!c?.identifier || !c?.password) return { ok: false, error: "Missing cached teacher credentials" };
-      const spec = this.capabilityMap.getIntent("teacher_login");
-      const res = await this.router.execute({
-        intentSpec: spec,
-        intentName: "teacher_login",
-        parameters: { identifier: c.identifier, password: c.password },
-        sessionState,
-        prefer: "api",
-        fallbackAllowed: true,
-      });
-      if (res.ok) sessionState.auth.isAuthenticated = true;
-      return res;
-    }
-
-    // default to student
-    const c = sessionState.auth.credentials.student;
-    if (!c?.identifier || !c?.password) return { ok: false, error: "Missing cached student credentials" };
-    const spec = this.capabilityMap.getIntent("student_login");
-    const res = await this.router.execute({
-      intentSpec: spec,
-      intentName: "student_login",
-      parameters: { identifier: c.identifier, password: c.password },
-      sessionState,
-      prefer: "api",
-      fallbackAllowed: true,
+    // ---------------------------------------------------------
+    // LAYER 2: RESPONSE GENERATION LAYER
+    // ---------------------------------------------------------
+    this.logger.info("[LAYER 2] Generating natural language response...");
+    const finalResponse = await this.gemini.generateResponse({
+      userMessage: userText,
+      intent: plan.intent,
+      data: executionResult?.data,
+      error: executionResult?.error,
+      sessionState
     });
-    if (res.ok) {
-      sessionState.role = "student";
-      sessionState.auth.isAuthenticated = true;
-    }
-    return res;
-  }
-}
 
-function buildMissingParamsPrompt(intentName, missing) {
-  const m = new Set(missing || []);
-  // Friendly prompts for high-value flows.
-  if (intentName === "student_register_course") {
-    if (m.has("semester") && m.has("course_code")) return "Which semester and which course code would you like to register (e.g., Spring-2026 and CS101)?";
-    if (m.has("semester")) return "Which semester is this for? (e.g., Spring-2026)";
-    if (m.has("course_code")) return "Which course code would you like to register? (e.g., CS101)";
-  }
-  if (intentName === "student_unregister_course") {
-    if (m.has("semester") && m.has("course_code")) return "Which semester and course code should I drop/unregister?";
-    if (m.has("semester")) return "Which semester is this for?";
-    if (m.has("course_code")) return "Which course code should I drop/unregister?";
-  }
-  if (intentName === "student_view_marks" || intentName === "student_view_attendance") {
-    if (m.has("semester") && m.has("course_code")) return "Which semester and course code should I use?";
-    if (m.has("semester")) return "Which semester is this for?";
-    if (m.has("course_code")) return "Which course code is this for?";
-  }
-  if (intentName === "student_login") return "Please provide your roll no/email and password.";
-  if (intentName === "teacher_login") return "Please provide your teacher username/email and password.";
-  return `I need a bit more info: ${[...m].join(", ")}.`;
-}
+    sessionState.conversation.push({ role: "assistant", content: finalResponse, ts: Date.now() });
+    this.logger.info(`[LAYER 2] Final Response: "${finalResponse}"`);
 
-function buildHumanFriendlyReply({ intentName, result }) {
-  if (!result) return "I couldn’t run that action.";
-  if (result.ok) {
-    switch (intentName) {
-      case "student_register":
-        return "Your student account is created and you’re logged in.";
-      case "student_login":
-        return "You’re logged in as a student.";
-      case "teacher_login":
-        return "You’re logged in as a teacher.";
-      case "student_register_course":
-        return `Course registered successfully (${result.mode}).`;
-      case "student_unregister_course":
-        return `Course unregistered successfully (${result.mode}).`;
-      case "student_view_marks":
-        return `Here are your marks (${result.mode}).`;
-      case "student_view_attendance":
-        return `Here is your attendance (${result.mode}).`;
-      case "logout":
-        return "Logged out.";
-      default:
-        return `Done (${result.mode}).`;
+    return { 
+      reply: finalResponse, 
+      mode: "response",
+      executed: executionResult 
+    };
+  }
+
+  /**
+   * LAYER 0: CONVERSATION DETECTION
+   */
+  checkLayer0(text) {
+    const t = text.toLowerCase().trim();
+    
+    // Greetings
+    const greetings = ["hi", "hello", "hey", "good morning", "good evening", "good afternoon"];
+    if (greetings.some(g => t === g || t.startsWith(g + " "))) {
+      return "Hey! How can I help you with your LMS today?";
     }
+
+    // Casual chat
+    const casual = ["how are you", "what's up", "how's it going"];
+    if (casual.some(c => t.includes(c))) {
+      return "I'm good 😊 How can I assist you?";
+    }
+
+    // Gratitude
+    const gratitude = ["thanks", "thank you", "thx", "much appreciated"];
+    if (gratitude.some(g => t.includes(g))) {
+      return "You're welcome!";
+    }
+
+    // Farewell
+    const farewell = ["bye", "see you", "goodbye", "catch you later"];
+    if (farewell.some(f => t.includes(f))) {
+      return "Goodbye! Have a great day!";
+    }
+
+    return null;
   }
-  const base = result.error || "Action failed.";
-  if (result.attempts?.length) {
-    return `I couldn’t complete that. I tried: ${result.attempts.map((a) => `${a.mode}${a.ok ? "" : "✗"}`).join(" → ")}.\nError: ${base}`;
-  }
-  return `I couldn’t complete that.\nError: ${base}`;
 }
 
 function isAuthError(result) {

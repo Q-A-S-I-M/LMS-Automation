@@ -23,7 +23,10 @@ const envSchema = z.object({
   SELENIUM_BROWSER: z.enum(["chrome"]).default("chrome"),
 });
 
-export const config = envSchema.parse(process.env);
+export const config = {
+  ...envSchema.parse(process.env),
+  GEMINI_MODEL: "gemini-2.5-flash",
+};
 
 export function allowedOriginsSet() {
   return new Set(

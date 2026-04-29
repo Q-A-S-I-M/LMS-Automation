@@ -6,7 +6,8 @@ export function sessionRoutes({ sessions }) {
 
   // Create session and set cookie
   router.post("/session", (req, res) => {
-    const { token } = sessions.createSession({ userHint: req.body?.userHint || null });
+    const { userId, role, isAuthenticated } = req.body || {};
+    const { token } = sessions.createSession({ userId, role, isAuthenticated });
     res.cookie(config.SESSION_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

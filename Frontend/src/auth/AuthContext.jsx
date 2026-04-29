@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
+import { agentApi } from "../api/agent";
 
 const AuthContext = createContext(null);
 
@@ -18,6 +19,15 @@ export function AuthProvider({ children }) {
         setRole(res.role);
         setStudent(res.student || null);
         setTeacher(res.teacher || null);
+        
+        // Handoff session to agent if authenticated
+        if (res.role) {
+          await agentApi.createSession({
+            userId: res.role === "teacher" ? res.teacher.id : res.student.roll_no,
+            role: res.role,
+            isAuthenticated: true
+          }).catch(err => console.error("Agent session handoff failed:", err));
+        }
       } catch {
         if (!alive) return;
         setRole(null);
@@ -44,6 +54,14 @@ export function AuthProvider({ children }) {
         setRole("student");
         setStudent(res.student);
         setTeacher(null);
+
+        // Handoff to agent
+        await agentApi.createSession({
+          userId: res.student.roll_no,
+          role: "student",
+          isAuthenticated: true
+        }).catch(err => console.error("Agent session handoff failed:", err));
+
         return res;
       },
       async register(payload) {
@@ -51,6 +69,14 @@ export function AuthProvider({ children }) {
         setRole("student");
         setStudent(res.student);
         setTeacher(null);
+
+        // Handoff to agent
+        await agentApi.createSession({
+          userId: res.student.roll_no,
+          role: "student",
+          isAuthenticated: true
+        }).catch(err => console.error("Agent session handoff failed:", err));
+
         return res;
       },
       async teacherLogin(payload) {
@@ -58,11 +84,20 @@ export function AuthProvider({ children }) {
         setRole("teacher");
         setTeacher(res.teacher);
         setStudent(null);
+
+        // Handoff to agent
+        await agentApi.createSession({
+          userId: res.teacher.id,
+          role: "teacher",
+          isAuthenticated: true
+        }).catch(err => console.error("Agent session handoff failed:", err));
+
         return res;
       },
       async logout() {
         try {
           await api.logout();
+          await agentApi.endSession();
         } catch {
           // ignore
         }

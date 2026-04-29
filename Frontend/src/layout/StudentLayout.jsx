@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { ChatWidget } from "../components/ChatWidget";
 
 const navItems = [
   { to: "/app", label: "Dashboard" },
@@ -56,6 +57,8 @@ export function StudentLayout() {
       <main className="main">
         <Outlet />
       </main>
+      
+      <ChatWidget />
     </div>
   );
 }

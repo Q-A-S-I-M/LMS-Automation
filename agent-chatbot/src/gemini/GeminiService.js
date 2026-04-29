@@ -13,20 +13,10 @@ export class GeminiService {
   }
 
   /**
-   * REQUIRED OUTPUT FORMAT:
-   * {
-   *  "intent": "string",
-   *  "confidence": 0-1,
-   *  "required_params": [],
-   *  "provided_params": {},
-   *  "missing_params": [],
-   *  "requires_auth": true/false,
-   *  "role": "student|teacher",
-   *  "action": "api|selenium",
-   *  "fallback_allowed": true/false
-   * }
+   * LAYER 1: INTENT DETECTION LAYER
+   * STRICT JSON ONLY
    */
-  async proposePlan({ capabilityMap, sessionState, userMessage }) {
+  async detectIntent({ capabilityMap, sessionState, userMessage }) {
     const model = this.client.getGenerativeModel({ model: this.modelName }, { apiVersion: this.apiVersion });
 
     const allowedIntents = capabilityMap.listIntents();
@@ -35,66 +25,116 @@ export class GeminiService {
       isAuthenticated: sessionState.auth?.isAuthenticated === true,
     };
 
-    const system = [
-      "You are an agent planner for an LMS assistant.",
-      "SINGLE SOURCE OF TRUTH: You MUST ONLY select an intent from ALLOWED_INTENTS.",
-      "You MUST NOT invent intents, parameters, endpoints, or capabilities not present in ALLOWED_INTENTS.",
-      "CRITICAL: If the user message is a greeting (like 'hello', 'hi', 'hey'), small talk, or is unrelated to LMS actions, you MUST return an empty string \"\" for the 'intent' field. DO NOT guess an intent.",
-      "Role control: output role must be exactly 'student' or 'teacher'.",
-      "If session is already authenticated with a known role, prefer that role unless user explicitly requests switching.",
-      "Select action 'api' by default. Use 'selenium' only when explicitly needed (e.g., web-only tasks) or as fallback.",
-      "Output MUST be ONLY JSON in the exact required format (no markdown, no prose).",
-    ].join("\n");
+    const systemPrompt = `
+      You are an LMS Intent Detector. 
+      Your ONLY job is to classify the user's message into an LMS intent.
 
-    const requiredFormat = {
-      intent: "string",
-      confidence: "number (0..1)",
-      required_params: "string[]",
-      provided_params: "object",
-      missing_params: "string[]",
-      requires_auth: "boolean",
-      role: "student|teacher",
-      action: "api|selenium",
-      fallback_allowed: "boolean",
-    };
+      PROMPT RULES:
+      - Output MUST be STRICT JSON ONLY.
+      - No explanations.
+      - No natural language.
 
-    const prompt = [
-      system,
-      "",
-      "AUTH_STATE:",
-      JSON.stringify(authSummary, null, 2),
-      "",
-      "ALLOWED_INTENTS:",
-      JSON.stringify(allowedIntents),
-      "",
-      "CAPABILITY_HINTS:",
-      "If user says: marks -> student_view_marks, attendance -> student_view_attendance, transcript -> student_view_transcript, register course -> student_register_course, drop/unregister -> student_unregister_course.",
-      "Teacher uploading marks -> teacher_upsert_marks.",
-      "",
-      "LAST_FEW_MESSAGES:",
-      JSON.stringify(sessionState.conversation.slice(-12), null, 2),
-      "",
-      "USER_MESSAGE:",
-      userMessage,
-      "",
-      "REQUIRED_OUTPUT_FORMAT:",
-      JSON.stringify(requiredFormat, null, 2),
-      "",
-      "Return ONLY JSON now (no extra keys).",
-    ].join("\n");
+      ALLOWED_INTENTS: ${JSON.stringify(allowedIntents)}
+      
+      USER_ROLE: ${authSummary.role || "unknown"}
+      IS_AUTHENTICATED: ${authSummary.isAuthenticated}
 
-    console.log("[GeminiService] Sending prompt to Gemini...");
+      OUTPUT_FORMAT:
+      {
+        "intent": "string",
+        "confidence": number (0 to 1),
+        "required_params": string[],
+        "provided_params": object,
+        "missing_params": string[],
+        "requires_auth": boolean,
+        "role": "student" | "teacher",
+        "action": "api" | "none",
+        "fallback_allowed": boolean
+      }
+
+      VALIDATION RULES:
+      - If intent is missing or unknown, set intent to "unknown".
+      - Confidence must be between 0 and 1.
+    `;
+
+    const prompt = `
+      ${systemPrompt}
+
+      USER_MESSAGE: "${userMessage}"
+      LAST_INTENT: "${sessionState.task.lastIntent || "None"}"
+      
+      Return ONLY JSON.
+    `;
+
+    try {
+      let text;
+      let parsed;
+      let retries = 1;
+
+      while (retries >= 0) {
+        const res = await model.generateContent(prompt);
+        text = res.response.text();
+        try {
+          parsed = safeParseJson(text);
+          break;
+        } catch (e) {
+          if (retries === 0) throw e;
+          retries--;
+          console.warn("[GeminiService] Invalid JSON from Gemini, retrying once...");
+        }
+      }
+      
+      // Basic normalization
+      if (!parsed.intent) parsed.intent = "unknown";
+      if (typeof parsed.confidence !== "number") parsed.confidence = 0;
+      
+      return parsed;
+    } catch (err) {
+      console.error("[GeminiService] detectIntent error after retries:", err.message);
+      return { intent: "unknown", confidence: 0, required_params: [], provided_params: {}, missing_params: [], requires_auth: false, role: "student", action: "none", fallback_allowed: false };
+    }
+  }
+
+  /**
+   * LAYER 2: RESPONSE GENERATION LAYER
+   * NATURAL LANGUAGE ONLY
+   */
+  async generateResponse({ userMessage, intent, data, error, sessionState }) {
+    const model = this.client.getGenerativeModel({ model: this.modelName }, { apiVersion: this.apiVersion });
+
+    const systemPrompt = `
+      You are a friendly LMS Assistant. 
+      Convert backend data into a natural, human-like response.
+
+      RULES:
+      - Convert backend data into natural language.
+      - NEVER return JSON.
+      - NEVER mention APIs or backend or internal systems.
+      - Keep responses user-friendly and short.
+      - If error exists, provide a friendly message (e.g., "I couldn't find that record" instead of "404 Not Found").
+      - If data is empty, say "No records found".
+      - If missing params, ask the user clearly for them.
+    `;
+
+    const prompt = `
+      ${systemPrompt}
+
+      CONTEXT:
+      - User Message: "${userMessage}"
+      - Intent: "${intent}"
+      - Backend Data: ${JSON.stringify(data)}
+      - Error: ${error || "None"}
+      - User Role: ${sessionState.role}
+
+      Generate a natural assistant response:
+    `;
+
     try {
       const res = await model.generateContent(prompt);
-      const text = res.response.text();
-      console.log("[GeminiService] Raw response from Gemini:", text);
-      const parsed = safeParseJson(text);
-      const normalized = normalizePlan(parsed, { capabilityMap, authSummary });
-      console.log("[GeminiService] Normalized plan:", JSON.stringify(normalized, null, 2));
-      return normalized;
+      return res.response.text().trim();
     } catch (err) {
-      console.error("[GeminiService] Gemini API error:", err);
-      throw err;
+      console.error("[GeminiService] generateResponse error:", err.message);
+      return "I'm sorry, I'm having trouble generating a response right now. How else can I help you?";
     }
   }
 }
@@ -128,6 +168,7 @@ function normalizePlan(plan, { capabilityMap, authSummary }) {
     role: plan?.role === "teacher" ? "teacher" : "student",
     action: plan?.action === "selenium" ? "selenium" : "api",
     fallback_allowed: Boolean(plan?.fallback_allowed),
+    message: String(plan?.message || "").trim(),
   };
 
   // Hard safety: if intent not allowed, blank it so controller can refuse/ask.

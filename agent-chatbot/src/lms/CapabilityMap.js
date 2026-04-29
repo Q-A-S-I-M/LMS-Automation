@@ -33,10 +33,11 @@ export class CapabilityMap {
       if (!name) continue;
 
       const requiresAuth = parseRequiresAuth(chunk);
+      const allowedRoles = parseAllowedRoles(requiresAuth, name);
       const { requiredParams, optionalParams } = parseParams(chunk);
       const apiHints = parseApi(chunk);
 
-      intentsByName.set(name, { name, requiredParams, optionalParams, requiresAuth, apiHints });
+      intentsByName.set(name, { name, requiredParams, optionalParams, requiresAuth, allowedRoles, apiHints });
     }
 
     if (!intentsByName.size) {
@@ -71,6 +72,25 @@ function parseRequiresAuth(chunk) {
   // If unknown but says "yes", treat as any.
   if (val.startsWith("yes")) return "any";
   return "none";
+}
+
+function parseAllowedRoles(requiresAuth, intentName) {
+  // 1. Explicitly based on requiresAuth
+  if (requiresAuth === "student") return ["student"];
+  if (requiresAuth === "teacher") return ["teacher"];
+  if (requiresAuth === "any") return ["student", "teacher"];
+
+  // 2. Inference based on intent name naming conventions if requiresAuth is "none" or "any"
+  const name = intentName.toLowerCase();
+  if (name.startsWith("student_")) return ["student"];
+  if (name.startsWith("teacher_")) return ["teacher"];
+
+  // 3. Fallback for common patterns
+  if (name.includes("marks") && !name.includes("upsert")) return ["student"];
+  if (name.includes("upsert") || name.includes("create")) return ["teacher"];
+  if (name.includes("transcript") || name.includes("registration")) return ["student"];
+
+  return ["student", "teacher"]; // Default to both for general actions like login/logout
 }
 
 function parseParams(chunk) {

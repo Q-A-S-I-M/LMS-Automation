@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { ChatWidget } from "../components/ChatWidget";
 
 function Item({ to, children }) {
   return (
@@ -46,6 +47,7 @@ export function TeacherLayout() {
       <main className="content">
         <Outlet />
       </main>
+      <ChatWidget />
     </div>
   );
 }

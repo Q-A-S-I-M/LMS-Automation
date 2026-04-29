@@ -18,7 +18,7 @@ export class SessionManager {
     this.locks = new Map(); // sessionId -> Promise queue
   }
 
-  createSession({ userHint = null } = {}) {
+  createSession({ userId = null, role = null, isAuthenticated = false } = {}) {
     const sessionId = uuidv4();
     const now = Date.now();
     const expiresAt = now + this.ttlMs;
@@ -28,27 +28,20 @@ export class SessionManager {
       createdAt: now,
       updatedAt: now,
       // Identity & authorization
-      role: null, // "student" | "teacher" | null
+      userId, // Unified ID from LMS (roll_no for students, id for teachers)
+      role, // "student" | "teacher" | null
       auth: {
-        isAuthenticated: false,
-        // If using direct API calls: hold LMS cookie jar to send in fetch.
-        // If using selenium: can hold last-known success timestamp.
-        lmsCookies: [], // [{name,value,domain,path,expires,httpOnly,secure,sameSite}]
-        // Optional in-memory credential cache (session-scoped only).
-        // WARNING: do not log this; only use to re-auth during the session.
-        credentials: {
-          student: null, // { identifier, password }
-          teacher: null, // { identifier, password }
-        },
+        isAuthenticated,
+        lmsCookies: [],
       },
       // Conversation and agent memory
       conversation: [], // [{role:"user"|"assistant"|"system", content, ts}]
       task: {
         activeIntent: null,
+        lastIntent: null,
         pendingSlots: {}, // {paramName: {reason, askedAt}}
         lastAction: null,
       },
-      userHint,
     };
 
     this.sessions.set(sessionId, { state, expiresAt });

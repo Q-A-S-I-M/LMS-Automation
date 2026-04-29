@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 /**
  * Executes an LMS action via direct backend API call.
@@ -9,78 +10,109 @@ export class ApiExecutor {
     this.apiBase = apiBase;
   }
 
-  async execute({ intentSpec, parameters, sessionState }) {
+  async execute({ intentSpec, parameters, sessionState, intentName }) {
     const method = intentSpec?.apiHints?.method;
     const p = intentSpec?.apiHints?.path;
+
     if (!method || !p) {
-      console.error("[ApiExecutor] Missing API hints for intent spec:", intentSpec);
+      logger.error(`No API mapping found for intent: ${intentName || "unknown"}`);
       return {
         ok: false,
-        error: "No API mapping found for this intent (capability map missing API hints).",
+        error: `No API mapping found for intent: ${intentName || "unknown"}`,
       };
     }
 
-    const { url, body } = this._buildRequest({ method, path: p, parameters });
-    console.log(`[ApiExecutor] Fetching: ${method} ${url}`);
-    if (body) console.log(`[ApiExecutor] Request body:`, JSON.stringify(body, null, 2));
-
+    const { url, body } = this._buildRequest({ method, path: p, parameters, sessionState });
     const cookieHeader = serializeCookieHeader(sessionState?.auth?.lmsCookies || []);
-    if (cookieHeader) console.log(`[ApiExecutor] Sending cookies: ${cookieHeader}`);
+
+    // Logging BEFORE execution
+    logger.info(`[API CALL] Intent: ${intentName || "unknown"}`);
+    logger.info(`[API CALL] Endpoint: ${method} ${url}`);
+    if (body) {
+      logger.info(`[API CALL] Params: ${JSON.stringify(body)}`);
+    }
 
     try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      let res;
+      let attempt = 0;
+      const MAX_RETRIES = 2;
+
+      while (attempt <= MAX_RETRIES) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+          res = await fetch(url, {
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+            },
+            body: body ? JSON.stringify(body) : undefined,
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+          break; // Success or non-timeout error
+        } catch (err) {
+          if (err.name === 'AbortError' && attempt < MAX_RETRIES) {
+            attempt++;
+            logger.warn(`[API CALL] Timeout on ${url}. Retrying (${attempt}/${MAX_RETRIES})...`);
+            continue;
+          }
+          throw err;
+        }
+      }
 
       const data = await res.json().catch(() => null);
-      console.log(`[ApiExecutor] Response status: ${res.status}`);
-      if (data) console.log(`[ApiExecutor] Response data:`, JSON.stringify(data, null, 2));
+
+      // Logging AFTER response
+      if (res.ok) {
+        logger.info(`[API RESPONSE] Status: ${res.status}`);
+        const shortenedData = data ? (JSON.stringify(data).length > 500 ? JSON.stringify(data).slice(0, 500) + "..." : JSON.stringify(data)) : "null";
+        logger.info(`[API RESPONSE] Data: ${shortenedData}`);
+      } else {
+        logger.error(`[API ERROR] Endpoint: ${url}`);
+        logger.error(`[API ERROR] Status: ${res.status}`);
+        
+        let friendlyError = data?.error || res.statusText || "Unknown error";
+        if (res.status === 404) friendlyError = "Resource not found";
+        if (res.status === 500) friendlyError = "Server error";
+        
+        logger.error(`[API ERROR] Message: ${friendlyError}`);
+        return { ok: false, status: res.status, error: friendlyError, data };
+      }
 
       // If the LMS sets auth cookie on login/register, update session cookie jar.
       const setCookie = res.headers.get("set-cookie");
       if (setCookie) {
-        console.log(`[ApiExecutor] Set-Cookie header received.`);
         const parsed = parseSetCookieHeader(setCookie);
         if (parsed.length) {
           sessionState.auth.lmsCookies = mergeCookies(sessionState.auth.lmsCookies, parsed);
           sessionState.auth.isAuthenticated = true;
-          console.log(`[ApiExecutor] Session cookies updated and authenticated.`);
         }
       }
 
-      if (!res.ok) {
-        console.error(`[ApiExecutor] Request failed with status ${res.status}`);
-        return { ok: false, status: res.status, error: data?.error || `Request failed (${res.status})`, data };
-      }
       return { ok: true, status: res.status, data };
     } catch (err) {
-      console.error("[ApiExecutor] Fetch error:", err);
-      return { ok: false, error: `Network error: ${err.message}` };
+      logger.error(`[API ERROR] Endpoint: ${url}`);
+      logger.error(`[API ERROR] Message: ${err.message}`);
+      return { ok: false, error: err.name === 'AbortError' ? "Request timeout after retries" : `Network error: ${err.message}` };
     }
   }
 
-  _buildRequest({ method, path, parameters }) {
+  _buildRequest({ method, path, parameters, sessionState }) {
     const m = method.toUpperCase();
-
-    // For now: intent specs already include correct LMS paths.
-    // We only support:
-    // - JSON bodies for POST/PUT/PATCH
-    // - query expansion for a few known endpoints
-    //
-    // IMPORTANT: We do NOT invent endpoints; if something needs path params,
-    // the caller must provide the proper path by choosing correct intent API hint.
     let url = `${this.apiBase}${path}`;
     let body = undefined;
 
+    // Automatically inject userId into parameters if available and missing
+    const enhancedParams = { ...parameters };
+    // [REMOVED] roll_no injection; backend should identify user via session/token
+    
     if (m === "GET") {
-      // If user provided semester and path expects query, attach it if missing.
       const qs = new URLSearchParams();
-      for (const [k, v] of Object.entries(parameters || {})) {
+      for (const [k, v] of Object.entries(enhancedParams || {})) {
         if (v == null) continue;
         if (Array.isArray(v)) continue;
         qs.set(k, String(v));
@@ -89,7 +121,7 @@ export class ApiExecutor {
         url += (url.includes("?") ? "&" : "?") + qs.toString();
       }
     } else {
-      body = parameters || {};
+      body = enhancedParams || {};
     }
 
     return { url, body };

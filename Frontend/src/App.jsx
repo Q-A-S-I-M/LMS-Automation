@@ -21,7 +21,6 @@ import TeacherRegistrations from "./pages/TeacherRegistrations";
 import TeacherMarks from "./pages/TeacherMarks";
 import TeacherAttendance from "./pages/TeacherAttendance";
 import TeacherFeedback from "./pages/TeacherFeedback";
-import Chat from "./pages/Chat";
 
 export default function App() {
   return (
@@ -31,8 +30,6 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
-        {/* LMS AI assistant (agent-chatbot) — own session; not tied to LMS JWT */}
-        <Route path="/chat" element={<Chat />} />
 
         <Route
           path="/app"
