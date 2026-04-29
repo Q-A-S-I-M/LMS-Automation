@@ -9,14 +9,15 @@ const envSchema = z.object({
   SESSION_TTL_MS: z.coerce.number().int().positive().default(2 * 60 * 60 * 1000),
   SESSION_COOKIE_NAME: z.string().min(1).default("lms_agent_sid"),
 
-  LLM_PROVIDER: z.enum(["gemini", "ollama"]).default("gemini"),
+  LLM_PROVIDER: z.enum(["gemini", "ollama", "lmstudio"]).default("gemini"),
 
   GEMINI_API_KEY: z.string().min(1).optional(),
   GEMINI_MODEL: z.string().min(1).default("gemini-2.0-flash"),
   GEMINI_API_VERSION: z.string().min(1).default("v1beta"),
 
+  // Local LLM (Ollama or LM Studio)
   OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
-  OLLAMA_MODEL: z.string().min(1).default("granite4.1:3b"),
+  OLLAMA_MODEL: z.string().min(1).default("granite3.1-dense:8b"),
 
   LMS_API_BASE: z.string().url().default("http://localhost:5000"),
   LMS_WEB_BASE: z.string().url().default("http://localhost:5173"),

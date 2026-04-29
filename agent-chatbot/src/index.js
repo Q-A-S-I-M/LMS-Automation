@@ -74,8 +74,9 @@ async function bootstrap() {
   
   // Provider selection
   let llmService;
-  if (config.LLM_PROVIDER === "ollama") {
-    logger.info({ model: config.OLLAMA_MODEL }, "Using Ollama LLM provider");
+  if (config.LLM_PROVIDER === "ollama" || config.LLM_PROVIDER === "lmstudio") {
+    const providerName = config.LLM_PROVIDER === "ollama" ? "Ollama" : "LM Studio";
+    logger.info({ model: config.OLLAMA_MODEL, provider: providerName }, `Using ${providerName} LLM provider`);
     llmService = new OllamaService();
   } else {
     logger.info({ model: config.GEMINI_MODEL }, "Using Gemini LLM provider");
