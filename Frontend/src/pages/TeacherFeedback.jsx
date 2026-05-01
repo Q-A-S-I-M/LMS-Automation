@@ -67,11 +67,7 @@ export default function TeacherFeedback() {
       </div>
 
       {error ? <div className="error">{error}</div> : null}
-      {status ? (
-        <div className="panel" style={{ color: "rgba(229,231,235,0.85)" }}>
-          {status}
-        </div>
-      ) : null}
+      {status ? <div className="success">{status}</div> : null}
 
       <div className="panel">
         <div className="panelTitle">Feedback list</div>

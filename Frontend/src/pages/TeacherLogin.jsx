@@ -30,24 +30,46 @@ export default function TeacherLogin() {
   return (
     <div className="authWrap">
       <div className="authCard">
-        <div className="authTitle">Teacher Login</div>
-        <div className="authSub">Sign in as instructor to manage courses and evaluations.</div>
+        <div className="authHeader">
+          <div className="brandMark" style={{ width: 60, height: 60, fontSize: 24, background: "linear-gradient(135deg, #f87171, #fb923c)" }}>TM</div>
+          <div>
+            <div className="authTitle">Faculty Portal</div>
+            <div className="authSub">Secure instructor access</div>
+          </div>
+        </div>
 
-        {error ? <div className="error">{error}</div> : null}
+        {error ? <div className="error" style={{ marginBottom: 16 }}>{error}</div> : null}
 
         <form onSubmit={submit} className="form">
           <label className="field">
             <span>Username or Email</span>
-            <input className="input" value={usernameOrEmail} onChange={(e) => setUsernameOrEmail(e.target.value)} />
+            <input 
+              className="input" 
+              placeholder="faculty.id@univ.edu"
+              value={usernameOrEmail} 
+              onChange={(e) => setUsernameOrEmail(e.target.value)} 
+            />
           </label>
           <label className="field">
             <span>Password</span>
-            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input 
+              className="input" 
+              type="password" 
+              placeholder="••••••••"
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+            />
           </label>
-          <button className="btn" type="submit" disabled={loading || !usernameOrEmail || !password}>
-            {loading ? "Signing in..." : "Login"}
+          <button className="btn btnBlock" type="submit" disabled={loading || !usernameOrEmail || !password} style={{ height: 48, marginTop: 10 }}>
+            {loading ? "Authenticating..." : "Instructor Login"}
           </button>
         </form>
+
+        <div className="hint" style={{ textAlign: "center", marginTop: 24, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <a href="/login" style={{ color: "rgba(229,231,235,0.5)", fontSize: 12, textDecoration: "none" }}>
+            Not a faculty member? <span style={{ color: "#a5b4fc" }}>Student Portal</span>
+          </a>
+        </div>
       </div>
     </div>
   );

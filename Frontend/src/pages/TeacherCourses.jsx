@@ -4,10 +4,12 @@ import { api } from "../api/client";
 export default function TeacherCourses() {
   const [courses, setCourses] = useState([]);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
   const [form, setForm] = useState({ course_code: "", course_name: "", credit_hours: 3 });
 
   async function refresh() {
     setError("");
+    setStatus("");
     const res = await api.teacherCourses();
     setCourses(res.courses || []);
   }
@@ -31,6 +33,7 @@ export default function TeacherCourses() {
   async function create(e) {
     e.preventDefault();
     setError("");
+    setStatus("");
     try {
       await api.teacherCourseCreate({
         course_code: form.course_code,
@@ -38,6 +41,7 @@ export default function TeacherCourses() {
         credit_hours: Number(form.credit_hours),
       });
       setForm({ course_code: "", course_name: "", credit_hours: 3 });
+      setStatus("Course created successfully.");
       await refresh();
     } catch (err) {
       setError(err.message || "Failed to create course");
@@ -46,8 +50,10 @@ export default function TeacherCourses() {
 
   async function remove(course_code) {
     setError("");
+    setStatus("");
     try {
       await api.teacherCourseDelete(course_code);
+      setStatus("Course deleted.");
       await refresh();
     } catch (err) {
       setError(err.message || "Failed to delete course");
@@ -64,31 +70,34 @@ export default function TeacherCourses() {
       </div>
 
       {error ? <div className="error">{error}</div> : null}
+      {status ? <div className="success">{status}</div> : null}
 
       <div className="panel">
-        <div className="panelTitle">Create course</div>
-        <form onSubmit={create} className="form" style={{ gridTemplateColumns: "1fr 2fr 1fr auto" }}>
-          <label className="field">
-            <span>Code</span>
-            <input className="input" value={form.course_code} onChange={(e) => setForm((p) => ({ ...p, course_code: e.target.value }))} />
-          </label>
-          <label className="field">
-            <span>Name</span>
-            <input className="input" value={form.course_name} onChange={(e) => setForm((p) => ({ ...p, course_name: e.target.value }))} />
-          </label>
-          <label className="field">
-            <span>CH</span>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              value={form.credit_hours}
-              onChange={(e) => setForm((p) => ({ ...p, credit_hours: e.target.value }))}
-            />
-          </label>
-          <button className="btn" type="submit" disabled={!form.course_code || !form.course_name}>
-            Create
-          </button>
+        <div className="panelTitle">Create New Course</div>
+        <form onSubmit={create} className="form">
+          <div className="grid" style={{ gridTemplateColumns: "1fr 2fr 1fr auto", alignItems: "end", margin: 0 }}>
+            <label className="field">
+              <span>Course Code</span>
+              <input className="input" placeholder="CS-101" value={form.course_code} onChange={(e) => setForm((p) => ({ ...p, course_code: e.target.value }))} />
+            </label>
+            <label className="field">
+              <span>Course Name</span>
+              <input className="input" placeholder="Introduction to Computing" value={form.course_name} onChange={(e) => setForm((p) => ({ ...p, course_name: e.target.value }))} />
+            </label>
+            <label className="field">
+              <span>Credit Hours</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={form.credit_hours}
+                onChange={(e) => setForm((p) => ({ ...p, credit_hours: e.target.value }))}
+              />
+            </label>
+            <button className="btn" type="submit" disabled={!form.course_code || !form.course_name} style={{ height: 42 }}>
+              Add Course
+            </button>
+          </div>
         </form>
       </div>
 
@@ -111,7 +120,7 @@ export default function TeacherCourses() {
                   <td>{c.course_name}</td>
                   <td className="mono">{c.credit_hours}</td>
                   <td style={{ textAlign: "right" }}>
-                    <button className="btn btnGhost" type="button" onClick={() => remove(c.course_code)}>
+                    <button className="btn btnDanger" type="button" onClick={() => remove(c.course_code)}>
                       Delete
                     </button>
                   </td>

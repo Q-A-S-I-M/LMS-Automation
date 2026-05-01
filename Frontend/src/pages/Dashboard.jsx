@@ -44,42 +44,61 @@ export default function Dashboard() {
     <div className="page">
       <div className="pageHeader">
         <div>
-          <div className="pageTitle">Dashboard</div>
-          <div className="pageSub">Quick view of your academic data</div>
+          <div className="pageTitle">Welcome, {profile?.full_name || "Student"}</div>
+          <div className="pageSub">Academic summary and recent enrollments</div>
         </div>
       </div>
 
-      {loading ? <div className="muted">Loading...</div> : null}
+      {loading ? <div className="muted">Loading dashboard...</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
       {!loading && !error ? (
         <>
-          <div className="grid">
-            <StatCard title="Student" value={profile?.full_name || "-"} sub={profile?.roll_no} />
-            <StatCard title="Degree" value={profile?.degree || "-"} sub={`Section ${profile?.section || "-"}`} />
-            <StatCard title="Status" value={profile?.status || "-"} sub={profile?.campus || ""} />
-            <StatCard title="Courses" value={courses.length} sub="Enrolled (all semesters)" />
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+            <div className="card" style={{ borderLeft: "4px solid #60a5fa" }}>
+              <div className="cardTitle">Registration</div>
+              <div className="cardValue">{profile?.roll_no || "-"}</div>
+              <div className="cardSub">{profile?.degree || "-"}</div>
+            </div>
+            <div className="card" style={{ borderLeft: "4px solid #a78bfa" }}>
+              <div className="cardTitle">Current Program</div>
+              <div className="cardValue">{profile?.batch || "-"}</div>
+              <div className="cardSub">Section {profile?.section || "-"}</div>
+            </div>
+            <div className="card" style={{ borderLeft: "4px solid #34d399" }}>
+              <div className="cardTitle">Enrollments</div>
+              <div className="cardValue">{courses.length}</div>
+              <div className="cardSub">Active Courses</div>
+            </div>
+            <div className="card" style={{ borderLeft: "4px solid #fbbf24" }}>
+              <div className="cardTitle">Campus Status</div>
+              <div className="cardValue">{profile?.status || "-"}</div>
+              <div className="cardSub">{profile?.campus || "-"}</div>
+            </div>
           </div>
 
           <div className="panel">
-            <div className="panelTitle">Recent enrollments</div>
+            <div className="panelTitleRow">
+              <div className="panelTitle">Course List</div>
+              <div className="pill">{courses.length} Total</div>
+            </div>
             <div className="tableWrap">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Course</th>
-                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Course Name</th>
                     <th>CH</th>
                     <th>Semester</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {courses.slice(0, 8).map((c) => (
+                  {courses.map((c) => (
                     <tr key={`${c.course_code}-${c.semester}`}>
                       <td className="mono">{c.course_code}</td>
-                      <td>{c.course_name}</td>
-                      <td>{c.credit_hours}</td>
-                      <td>{c.semester}</td>
+                      <td style={{ fontWeight: 500 }}>{c.course_name}</td>
+                      <td className="mono">{c.credit_hours}</td>
+                      <td className="mono">{c.semester}</td>
                     </tr>
                   ))}
                   {courses.length === 0 ? (

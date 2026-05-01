@@ -96,29 +96,32 @@ export default function CourseRegistration() {
 
       {error ? <div className="error">{error}</div> : null}
       {finalized ? (
-        <div className="panel" style={{ color: "rgba(229,231,235,0.85)" }}>
+        <div className="success" style={{ marginBottom: 20 }}>
           Registration is locked for this semester{finalizedAt ? ` (finalized at ${new Date(finalizedAt).toLocaleString()})` : ""}.
           Courses can no longer be added or dropped.
         </div>
       ) : null}
 
-      <div className="grid">
-        <div className="card">
-          <div className="cardTitle">Semester</div>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <div className="card" style={{ borderLeft: "4px solid #60a5fa" }}>
+          <div className="cardTitle">Selected Semester</div>
           <div className="cardValue">{semester}</div>
+          <div className="cardSub">Academic Term</div>
         </div>
-        <div className="card">
-          <div className="cardTitle">Registered CH</div>
-          <div className="cardValue">{summary.total_credit_hours}</div>
-          <div className="cardSub">Max {summary.max_credit_hours}</div>
+        <div className="card" style={{ borderLeft: "4px solid #a78bfa" }}>
+          <div className="cardTitle">Credit Hours</div>
+          <div className="cardValue">{summary.total_credit_hours} / {summary.max_credit_hours}</div>
+          <div className="cardSub">Enrolled CH Limit</div>
         </div>
-        <div className="card">
-          <div className="cardTitle">Remaining CH</div>
-          <div className="cardValue">{remaining}</div>
+        <div className="card" style={{ borderLeft: "4px solid #34d399" }}>
+          <div className="cardTitle">Capacity Available</div>
+          <div className="cardValue">{remaining} CH</div>
+          <div className="cardSub">Remaining for this term</div>
         </div>
-        <div className="card">
-          <div className="cardTitle">Registered courses</div>
+        <div className="card" style={{ borderLeft: "4px solid #fbbf24" }}>
+          <div className="cardTitle">Course Count</div>
           <div className="cardValue">{my.length}</div>
+          <div className="cardSub">Registered in {semester}</div>
         </div>
       </div>
 

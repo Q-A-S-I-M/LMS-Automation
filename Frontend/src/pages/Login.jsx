@@ -32,22 +32,30 @@ export default function Login() {
     <div className="authWrap">
       <div className="authCard">
         <div className="authHeader">
-          <div className="brandMark">UP</div>
+          <div className="brandMark" style={{ width: 60, height: 60, fontSize: 24 }}>UP</div>
           <div>
-            <div className="authTitle">Student Login</div>
-            <div className="authSub">Roll No / Email</div>
+            <div className="authTitle">Welcome Back</div>
+            <div className="authSub">Sign in to your student portal</div>
           </div>
         </div>
 
         <form onSubmit={onSubmit} className="form">
           <label className="field">
-            <span>Roll no or email</span>
-            <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
+            <span>Roll Number or Email</span>
+            <input 
+              className="input"
+              placeholder="e.g. 22L-1234 or student@univ.edu"
+              value={identifier} 
+              onChange={(e) => setIdentifier(e.target.value)} 
+              required 
+            />
           </label>
 
           <label className="field">
             <span>Password</span>
             <input
+              className="input"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
@@ -57,24 +65,22 @@ export default function Login() {
 
           {error ? <div className="error">{error}</div> : null}
 
-          <button className="btn" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+          <button className="btn btnBlock" type="submit" disabled={loading} style={{ height: 48, marginTop: 10 }}>
+            {loading ? "Verifying..." : "Sign In"}
           </button>
         </form>
 
-      <div className="hint">
-        Don’t have an account?{" "}
-        <a href="/register" style={{ color: "#c7d2fe" }}>
-          Register
-        </a>
-        <div style={{ marginTop: 8 }}>
-        </div>
-        <div style={{ marginTop: 8 }}>
-          <a href="/chat" style={{ color: "#c7d2fe" }}>
-            Open AI assistant (chatbot)
+        <div className="hint" style={{ textAlign: "center", marginTop: 24, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          Don’t have an account?{" "}
+          <a href="/register" style={{ color: "#a5b4fc", fontWeight: 600, textDecoration: "none" }}>
+            Create Account
           </a>
+          <div style={{ marginTop: 12 }}>
+            <a href="/teacher/login" style={{ color: "rgba(229,231,235,0.5)", fontSize: 12, textDecoration: "none" }}>
+              Are you a faculty member? <span style={{ color: "#a5b4fc" }}>Teacher Login</span>
+            </a>
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );

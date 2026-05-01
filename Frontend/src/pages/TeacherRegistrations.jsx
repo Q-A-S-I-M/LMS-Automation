@@ -112,7 +112,7 @@ export default function TeacherRegistrations() {
             Approve selected
           </button>
           <button
-            className="btn btnGhost"
+            className="btn btnDanger"
             type="button"
             onClick={() => decide("reject", selected)}
             disabled={!course || selected.length === 0}
@@ -123,11 +123,7 @@ export default function TeacherRegistrations() {
       </div>
 
       {error ? <div className="error">{error}</div> : null}
-      {status ? (
-        <div className="panel" style={{ color: "rgba(229,231,235,0.85)" }}>
-          {status}
-        </div>
-      ) : null}
+      {status ? <div className="success">{status}</div> : null}
 
       <div className="panel">
         <div className="panelTitle">Registrations</div>
@@ -183,7 +179,7 @@ export default function TeacherRegistrations() {
                       Enroll
                     </button>{" "}
                     <button
-                      className="btn btnGhost"
+                      className="btn btnDanger"
                       type="button"
                       onClick={() => decide("reject", [r.roll_no])}
                       disabled={r.status !== "Registered" || !course || r.course_code !== course}

@@ -37,8 +37,8 @@ export default function Attendance() {
         const res = await api.courses();
         if (!alive) return;
         setCourses(res.courses || []);
-        const first = res.courses?.[0];
-        setSelection(first ? `${first.course_code}|${first.semester}` : "");
+        // No auto-selection to allow placeholder to show
+        setSelection("");
       } catch (e) {
         if (!alive) return;
         setError(e.message || "Failed to load courses");
@@ -81,37 +81,41 @@ export default function Attendance() {
         </div>
 
         <div className="row">
-          <select
-            className="select"
-            value={selection}
-            onChange={(e) => setSelection(e.target.value)}
-            disabled={loading || courses.length === 0}
-          >
-            {courses.map((c) => (
-              <option key={`${c.course_code}-${c.semester}`} value={`${c.course_code}|${c.semester}`}>
-                {c.semester} — {c.course_code} — {c.course_name}
-              </option>
-            ))}
-          </select>
+          <label className="field" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <span style={{ whiteSpace: "nowrap" }}>Select Course:</span>
+            <select
+              className="select"
+              value={selection}
+              onChange={(e) => setSelection(e.target.value)}
+              disabled={loading || courses.length === 0}
+            >
+              <option value="">Choose a course...</option>
+              {courses.map((c) => (
+                <option key={`${c.course_code}-${c.semester}`} value={`${c.course_code}|${c.semester}`}>
+                  {c.semester} — {c.course_code} — {c.course_name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
       {error ? <div className="error">{error}</div> : null}
 
       {selected && data?.summary ? (
-        <div className="grid">
-          <div className="card">
-            <div className="cardTitle">Course</div>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+          <div className="card" style={{ borderLeft: "4px solid #60a5fa" }}>
+            <div className="cardTitle">Active Course</div>
             <div className="cardValue mono">{selected.course_code}</div>
             <div className="cardSub">{selected.course_name}</div>
           </div>
-          <div className="card">
-            <div className="cardTitle">Present</div>
-            <div className="cardValue">{data.summary.present}</div>
-            <div className="cardSub">out of {data.summary.total_lectures}</div>
+          <div className="card" style={{ borderLeft: "4px solid #34d399" }}>
+            <div className="cardTitle">Total Presence</div>
+            <div className="cardValue">{data.summary.present} / {data.summary.total_lectures}</div>
+            <div className="cardSub">Lectures Attended</div>
           </div>
-          <div className="card">
-            <div className="cardTitle">Percentage</div>
+          <div className="card" style={{ borderLeft: "4px solid #fbbf24" }}>
+            <div className="cardTitle">Attendance %</div>
             <div className="cardValue">
               <ProgressBar value={data.summary.percentage} />
             </div>

@@ -42,7 +42,7 @@ export function StudentLayout() {
 
         <div className="sidebarFooter">
           <button
-            className="btn btnGhost"
+            className="btn btnGhost btnBlock"
             onClick={() => {
               logout();
               navigate("/login");

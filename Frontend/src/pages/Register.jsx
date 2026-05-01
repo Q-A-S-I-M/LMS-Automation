@@ -45,81 +45,84 @@ export default function Register() {
 
   return (
     <div className="authWrap">
-      <div className="authCard">
+      <div className="authCard" style={{ width: "min(640px, 100%)" }}>
         <div className="authHeader">
-          <div className="brandMark">UP</div>
+          <div className="brandMark" style={{ width: 60, height: 60, fontSize: 24 }}>UP</div>
           <div>
-            <div className="authTitle">Student Registration</div>
-            <div className="authSub">Create your portal account</div>
+            <div className="authTitle">Create Account</div>
+            <div className="authSub">Join the university student portal</div>
           </div>
         </div>
 
         <form onSubmit={onSubmit} className="form">
-          <label className="field">
-            <span>Roll no</span>
-            <input value={form.roll_no} onChange={(e) => setField("roll_no", e.target.value)} required />
-          </label>
-
-          <label className="field">
-            <span>Full name</span>
-            <input
-              value={form.full_name}
-              onChange={(e) => setField("full_name", e.target.value)}
-              required
-            />
-          </label>
-
-          <label className="field">
-            <span>Email</span>
-            <input value={form.email} onChange={(e) => setField("email", e.target.value)} required />
-          </label>
-
-          <label className="field">
-            <span>Password (min 6 chars)</span>
-            <input
-              type="password"
-              value={form.password}
-              onChange={(e) => setField("password", e.target.value)}
-              required
-            />
-          </label>
-
-          <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: 16, margin: 0 }}>
             <label className="field">
-              <span>Degree</span>
-              <input value={form.degree} onChange={(e) => setField("degree", e.target.value)} />
+              <span>Roll Number</span>
+              <input className="input" placeholder="22L-1234" value={form.roll_no} onChange={(e) => setField("roll_no", e.target.value)} required />
+            </label>
+
+            <label className="field">
+              <span>Full Name</span>
+              <input
+                className="input"
+                placeholder="John Doe"
+                value={form.full_name}
+                onChange={(e) => setField("full_name", e.target.value)}
+                required
+              />
+            </label>
+          </div>
+
+          <div className="grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: 16, margin: 0 }}>
+            <label className="field">
+              <span>Email Address</span>
+              <input className="input" placeholder="student@univ.edu" value={form.email} onChange={(e) => setField("email", e.target.value)} required />
+            </label>
+
+            <label className="field">
+              <span>Password</span>
+              <input
+                className="input"
+                type="password"
+                placeholder="min 6 characters"
+                value={form.password}
+                onChange={(e) => setField("password", e.target.value)}
+                required
+              />
+            </label>
+          </div>
+
+          <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16, margin: 0 }}>
+            <label className="field">
+              <span>Degree Program</span>
+              <input className="input" placeholder="BS Computer Science" value={form.degree} onChange={(e) => setField("degree", e.target.value)} />
             </label>
             <label className="field">
               <span>Section</span>
-              <input value={form.section} onChange={(e) => setField("section", e.target.value)} />
+              <input className="input" placeholder="6A" value={form.section} onChange={(e) => setField("section", e.target.value)} />
             </label>
             <label className="field">
               <span>Batch</span>
-              <input value={form.batch} onChange={(e) => setField("batch", e.target.value)} />
+              <input className="input" placeholder="2022" value={form.batch} onChange={(e) => setField("batch", e.target.value)} />
             </label>
             <label className="field">
               <span>Campus</span>
-              <input value={form.campus} onChange={(e) => setField("campus", e.target.value)} />
+              <input className="input" placeholder="Main Campus" value={form.campus} onChange={(e) => setField("campus", e.target.value)} />
             </label>
           </div>
 
           {error ? <div className="error">{error}</div> : null}
 
-          <button className="btn" type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create account"}
+          <button className="btn btnBlock" type="submit" disabled={loading} style={{ height: 48, marginTop: 10 }}>
+            {loading ? "Creating account..." : "Complete Registration"}
           </button>
         </form>
 
-        <div className="hint">
+        <div className="hint" style={{ textAlign: "center", marginTop: 24, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
           Already have an account?{" "}
-          <a href="/login" style={{ color: "#c7d2fe" }}>
-            Login
+          <a href="/login" style={{ color: "#a5b4fc", fontWeight: 600, textDecoration: "none" }}>
+            Sign In
           </a>
-          <div style={{ marginTop: 8 }}>
-            <a href="/chat" style={{ color: "#c7d2fe" }}>
-              Open AI assistant (chatbot)
-            </a>
-          </div>
         </div>
       </div>
     </div>
